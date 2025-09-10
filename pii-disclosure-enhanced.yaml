@@ -1,0 +1,156 @@
+id: pii-disclosure-enhanced
+info:
+  name: Enhanced PII Information Disclosure
+  author: cross0v3r
+  severity: high
+  description: Detecta exposição de informações pessoais identificáveis (PII) com validação avançada
+  tags: pii,privacy,exposure,critical
+
+requests:
+  - method: GET
+    path:
+      - "{{BaseURL}}"
+    matchers-condition: and
+    matchers:
+      # Garante que a resposta é bem-sucedida
+      - type: status
+        status:
+          - 200
+          - 201
+          - 202
+
+      # Padrões de PII (com validação avançada)
+      - type: regex
+        part: body
+        condition: or
+        regex:
+          # CPF (formatos válidos)
+          - '(?<!\d)([0-9]{3}\.?[0-9]{3}\.?[0-9]{3}-?[0-9]{2})(?!\d)'
+          - '(?<!\d)([0-9]{11})(?!\d)'
+          
+          # RG (formatos brasileiros)
+          - '(?<!\d)([0-9]{2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9]|[X])(?!\d)'
+          - '(?<!\d)([0-9]{9})(?!\d)'
+          
+          # Cartão de crédito (formatos válidos)
+          - '(?<!\d)([0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4})(?!\d)'
+          - '(?<!\d)([0-9]{16})(?!\d)'
+          
+          # E-mail (com validação de domínio)
+          - '([a-zA-Z0-9._%+-]+@(gmail|yahoo|outlook|hotmail|uol|bol)\.[a-zA-Z]{2,})'
+          
+          # Telefone (formatos brasileiros)
+          - '(\([0-9]{2}\)\s?[0-9]{4,5}-?[0-9]{4})'
+          - '([0-9]{2}\s?[0-9]{4,5}-?[0-9]{4})'
+          - '(?<!\d)([0-9]{10,11})(?!\d)'
+          
+          # Data de nascimento (formatos comuns)
+          - '([0-9]{2}/[0-9]{2}/[0-9]{4})'
+          - '([0-9]{4}-[0-9]{2}-[0-9]{2})'
+          
+          # Passaporte brasileiro
+          - '([A-Z]{2}[0-9]{6})'
+          
+          # Título de eleitor
+          - '([0-9]{12})'
+          
+          # CNPJ
+          - '([0-9]{2}\.?[0-9]{3}\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2})'
+          - '(?<!\d)([0-9]{14})(?!\d)'
+
+      # Filtros para reduzir falsos positivos
+      - type: dsl
+        dsl:
+          - "!contains(to_lower(body), 'exemplo')"
+          - "!contains(to_lower(body), 'teste')"
+          - "!contains(to_lower(body), 'sample')"
+          - "!contains(to_lower(body), 'demo')"
+          - "!contains(to_lower(body), 'protocolo')"
+          - "!contains(to_lower(body), 'matrícula')"
+          - "!contains(to_lower(body), 'código')"
+          - "!contains(to_lower(body), 'id:')"
+          - "!contains(to_lower(body), 'token:')"
+          - "!contains(to_lower(body), 'hash:')"
+        condition: and
+
+    # Extração de dados encontrados
+    extractors:
+      - type: regex
+        part: body
+        name: cpf
+        regex:
+          - '([0-9]{3}\.?[0-9]{3}\.?[0-9]{3}-?[0-9]{2})'
+          - '([0-9]{11})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: rg
+        regex:
+          - '([0-9]{2}\.?[0-9]{3}\.?[0-9]{3}-?[0-9]|[X])'
+          - '([0-9]{9})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: credit_card
+        regex:
+          - '([0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4}[ -]?[0-9]{4})'
+          - '([0-9]{16})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: email
+        regex: '([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: phone
+        regex:
+          - '(\([0-9]{2}\)\s?[0-9]{4,5}-?[0-9]{4})'
+          - '([0-9]{2}\s?[0-9]{4,5}-?[0-9]{4})'
+          - '([0-9]{10,11})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: birth_date
+        regex:
+          - '([0-9]{2}/[0-9]{2}/[0-9]{4})'
+          - '([0-9]{4}-[0-9]{2}-[0-9]{2})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: passport
+        regex: '([A-Z]{2}[0-9]{6})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: voter_id
+        regex: '([0-9]{12})'
+        group: 1
+        
+      - type: regex
+        part: body
+        name: cnpj
+        regex:
+          - '([0-9]{2}\.?[0-9]{3}\.?[0-9]{3}/?[0-9]{4}-?[0-9]{2})'
+          - '([0-9]{14})'
+        group: 1
+
+    # Análise de JSON para dados estruturados
+    - type: json
+      json:
+        - '.user.cpf'
+        - '.user.rg'
+        - '.payment.card_number'
+        - '.contact.email'
+        - '.contact.phone'
+        - '.person.birth_date'
+        - '.document.passport'
+        - '.document.voter_id'
+        - '.company.cnpj'
